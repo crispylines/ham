@@ -119,21 +119,19 @@ const RaceTrack = ({ roomId, lobbyId }: RaceTrackProps) => {
         const trackRect = trackRef.current.getBoundingClientRect();
 
         // Calculate starting position relative to the track
-        const startX = hamsterRect.left - trackRect.left + hamsterRect.width / 2;
-        const startY = hamsterRect.top - trackRect.top + hamsterRect.height / 2;
+        const startX = parseInt(hamsterElement.style.left) + 15; // Center of hamster (30px width / 2)
+        const startY = parseInt(hamsterElement.style.top); // Use the actual top position
 
-        // Calculate angle from velocity components
-        const angle = Math.atan2(velocityY, velocityX);
-        
         const newProjectile = {
             id: Math.random().toString(),
             x: startX,
             y: startY,
-            angle,
-            speed: 15, // Constant speed for more predictable movement
+            angle: Math.atan2(velocityY, velocityX),
+            speed: 8, // Adjust speed as needed
             fromHamsterId: mountedHamsterId,
         };
 
+        console.log('Creating new projectile:', newProjectile);
         projectilesRef.current = [...projectilesRef.current, newProjectile];
     }, []);
 
@@ -158,24 +156,20 @@ const RaceTrack = ({ roomId, lobbyId }: RaceTrackProps) => {
     const updateProjectiles = () => {
         if (!trackRef.current) return;
         
-        console.log('Current projectiles:', projectilesRef.current.length);
-        
         const trackWidth = trackRef.current.offsetWidth;
         const trackHeight = trackRef.current.offsetHeight;
         
-        const updatedProjectiles = projectilesRef.current.filter(projectile => {
+        projectilesRef.current = projectilesRef.current.filter(projectile => {
             // Update position using angle and speed
             projectile.x += Math.cos(projectile.angle) * projectile.speed;
             projectile.y += Math.sin(projectile.angle) * projectile.speed;
 
-            // Log projectile position
-            console.log('Projectile position:', { x: projectile.x, y: projectile.y });
+            // Log position for debugging
+            console.log('Projectile updated:', { x: projectile.x, y: projectile.y });
 
-            // Check if out of bounds with smaller margin
-            if (projectile.x < -50 || 
-                projectile.x > trackWidth + 50 || 
-                projectile.y < -50 || 
-                projectile.y > trackHeight + 50) {
+            // Check if out of bounds
+            if (projectile.x < -20 || projectile.x > trackWidth + 20 || 
+                projectile.y < -20 || projectile.y > trackHeight + 20) {
                 return false;
             }
 
@@ -214,8 +208,6 @@ const RaceTrack = ({ roomId, lobbyId }: RaceTrackProps) => {
 
             return !hasHit;
         });
-
-        projectilesRef.current = updatedProjectiles;
     };
 
     const createHitEffect = (x: number, y: number) => {
@@ -327,7 +319,7 @@ const RaceTrack = ({ roomId, lobbyId }: RaceTrackProps) => {
                     {projectilesRef.current.map(projectile => (
                         <div
                             key={`projectile-${projectile.id}`}
-                            className="absolute w-3 h-3 bg-white rounded-full z-40"
+                            className="absolute w-2 h-2 bg-white rounded-full z-40 energy-ball"
                             style={{
                                 left: `${projectile.x}px`,
                                 top: `${projectile.y}px`,
