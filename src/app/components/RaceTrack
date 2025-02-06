@@ -1,0 +1,85 @@
+import React, { useEffect, useRef } from 'react';
+import { useGame } from '../../../../contexts/GameContext';
+
+const RaceTrack = ({ roomId, lobbyId }) => {
+    const { hamsters, rooms } = useGame();
+    const trackRef = useRef(null);
+
+    useEffect(() => {
+        if (!rooms[roomId] || !rooms[roomId].lobbies[lobbyId] || rooms[roomId].lobbies[lobbyId].status !== 'racing') {
+            return; // Race not started or lobby/room doesn't exist
+        }
+
+        const lobbyHamsterIds = rooms[roomId].lobbies[lobbyId].hamsters;
+        const animationFrame = () => {
+            if (!trackRef.current) return; // Component unmounted
+
+            const trackWidth = trackRef.current.offsetWidth;
+            let finishedHamsters = [];
+
+            lobbyHamsterIds.forEach(hamsterId => {
+                const hamsterElement = document.getElementById(`hamster-${hamsterId}`);
+                if (!hamsterElement) return;
+
+                const currentPosition = hamsters[hamsterId].position;
+                const newPosition = currentPosition + hamsters[hamsterId].speed * 0.01; // Simulate movement
+                hamsters[hamsterId].position = newPosition; // Update position in context (state - consider better state update)
+                hamsterElement.style.left = `${Math.min(newPosition, trackWidth - 30)}px`; // Keep in track bounds (30px hamster width assumed)
+
+                if (newPosition >= trackWidth - 30) { // Check if finished (approximate finish line)
+                    finishedHamsters.push(hamsterId);
+                }
+            });
+
+            if (finishedHamsters.length < lobbyHamsterIds.length) {
+                requestAnimationFrame(animationFrame); // Continue animation
+            } else {
+                // Race finished (all hamsters reached finish line - very basic finish condition)
+                // In a real app, you'd have more precise finish line and winner logic.
+                // For this example, order is just based on who finished first in this animation loop.
+                const results = lobbyHamsterIds.sort((a, b) => hamsters[a].position - hamsters[b].position);
+                // Call a function to update game state with race results and status
+                // (You'll need to implement a `finishRace` function in your GameContext)
+                // For now, just log results:
+                console.log("Race Finished! Results:", results);
+                // In a real app, call a function in GameContext to set race status to 'finished' and store results
+                // Example (you'll need to add finishRace to GameContext):
+                // finishRace(roomId, lobbyId, results);
+            }
+        };
+
+        requestAnimationFrame(animationFrame); // Start the animation loop
+
+        return () => { // Cleanup on unmount
+            // Cancel animation frame if needed (though requestAnimationFrame is usually fine)
+        };
+    }, [roomId, lobbyId, hamsters, rooms]); // Re-run effect when race starts or hamster data changes
+
+
+    if (!rooms[roomId] || !rooms[roomId].lobbies[lobbyId] || rooms[roomId].lobbies[lobbyId].status !== 'racing') {
+        return <p>Race hasn't started yet or lobby not found.</p>;
+    }
+
+    const lobbyHamsterIds = rooms[roomId].lobbies[lobbyId].hamsters;
+
+    return (
+        <div className="race-track-container">
+            <h3>Race Track</h3>
+            <div className="race-track" ref={trackRef}>
+                {lobbyHamsterIds.map(hamsterId => (
+                    <div
+                        key={hamsterId}
+                        id={`hamster-${hamsterId}`}
+                        className="hamster-racer"
+                        style={{ position: 'absolute', bottom: 0, left: 0 }} // Start at left
+                    >
+                        <img src={hamsters[hamsterId].image} alt={hamsters[hamsterId].description} width={30} />
+                    </div>
+                ))}
+                <div className="finish-line"></div>
+            </div>
+        </div>
+    );
+};
+
+export default RaceTrack;

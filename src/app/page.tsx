@@ -1,101 +1,132 @@
-import Image from "next/image";
+'use client';  // Add this since we're using hooks
+
+import React, { useEffect, useState } from 'react';
+import { useGame } from '@/contexts/GameContext';
+import Link from 'next/link';
+
+interface Room {
+    id: string;
+    name: string;
+    lobbyCount: number;
+}
 
 export default function Home() {
-  return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-8 row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-semibold">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li>Save and see your changes instantly.</li>
-        </ol>
+    const { rooms, createRoom } = useGame();
+    const [roomNameInput, setRoomNameInput] = useState('');
+    const [availableRooms, setAvailableRooms] = useState<Room[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:min-w-44"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+    useEffect(() => {
+        const fetchRooms = async () => {
+            try {
+                const response = await fetch('/api/rooms');
+                const data = await response.json();
+                setAvailableRooms(data);
+            } catch (error) {
+                console.error('Failed to fetch rooms:', error);
+            } finally {
+                setIsLoading(false);
+            }
+        };
+        fetchRooms();
+    }, []);
+
+    const handleCreateRoom = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!roomNameInput.trim()) return;
+
+        try {
+            // First, create the room via API
+            const response = await fetch('/api/rooms', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ roomName: roomNameInput }),
+            });
+            
+            const data = await response.json();
+            
+            if (!response.ok) {
+                throw new Error(data.message || 'Failed to create room');
+            }
+
+            // Then update local state
+            const roomId = data.roomId;
+            createRoom(roomNameInput); // Update context
+            setRoomNameInput('');
+            setAvailableRooms(prevRooms => [...prevRooms, { id: roomId, name: roomNameInput, lobbyCount: 0 }]);
+        } catch (error) {
+            console.error('Failed to create room:', error);
+            // You might want to show an error message to the user here
+        }
+    };
+
+    return (
+        <div className="min-h-screen bg-gradient-to-b from-gray-900 to-gray-800 text-white">
+            <div className="max-w-4xl mx-auto p-8">
+                {/* Header Section */}
+                <div className="text-center mb-12">
+                    <h1 className="text-5xl font-bold mb-4 text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-purple-500">
+                        Hamster Race Game
+                    </h1>
+                    <p className="text-gray-400">Create or join a room to start racing your AI-generated hamsters!</p>
+                </div>
+
+                {/* Available Rooms Section */}
+                <div className="bg-gray-800 rounded-lg p-6 mb-8 shadow-lg">
+                    <h2 className="text-2xl font-semibold mb-4 flex items-center">
+                        <span className="mr-2">🏠</span> Available Rooms
+                    </h2>
+                    {isLoading ? (
+                        <div className="text-center py-8 text-gray-400">Loading rooms...</div>
+                    ) : availableRooms.length === 0 ? (
+                        <div className="text-center py-8 text-gray-400">No rooms available. Create one below!</div>
+                    ) : (
+                        <ul className="space-y-3">
+                            {availableRooms.map(room => (
+                                <li key={room.id} className="transition-all duration-200">
+                                    <Link 
+                                        href={`/rooms/${room.id}`}
+                                        className="block bg-gray-700 hover:bg-gray-600 rounded-lg p-4 transition-all duration-200"
+                                    >
+                                        <div className="flex justify-between items-center">
+                                            <span className="font-medium">{room.name}</span>
+                                            <span className="text-sm text-gray-400">
+                                                {room.lobbyCount} {room.lobbyCount === 1 ? 'Lobby' : 'Lobbies'}
+                                            </span>
+                                        </div>
+                                    </Link>
+                                </li>
+                            ))}
+                        </ul>
+                    )}
+                </div>
+
+                {/* Create Room Section */}
+                <div className="bg-gray-800 rounded-lg p-6 shadow-lg">
+                    <h2 className="text-2xl font-semibold mb-4 flex items-center">
+                        <span className="mr-2">👑</span> Create a New Room
+                        <span className="ml-2 text-sm text-gray-400">(Game Master)</span>
+                    </h2>
+                    <form onSubmit={handleCreateRoom} className="flex gap-4">
+                        <input
+                            type="text"
+                            placeholder="Enter room name..."
+                            value={roomNameInput}
+                            onChange={(e) => setRoomNameInput(e.target.value)}
+                            className="flex-1 px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg focus:outline-none focus:border-blue-500 text-white placeholder-gray-400"
+                        />
+                        <button 
+                            type="submit"
+                            className="px-6 py-2 bg-gradient-to-r from-blue-500 to-purple-500 text-white rounded-lg hover:opacity-90 transition-opacity duration-200 font-medium"
+                            disabled={!roomNameInput.trim()}
+                        >
+                            Create Room
+                        </button>
+                    </form>
+                </div>
+            </div>
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-6 flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
-    </div>
-  );
+    );
 }
