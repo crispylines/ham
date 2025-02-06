@@ -1,7 +1,8 @@
 'use client';
 
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useCallback } from 'react';
 import { useGame } from '@/contexts/GameContext';
+import GameControls from '@/components/GameControls';
 
 interface RaceTrackProps {
     roomId: string;
@@ -9,9 +10,21 @@ interface RaceTrackProps {
 }
 
 const RaceTrack = ({ roomId, lobbyId }: RaceTrackProps) => {
-    const { hamsters, rooms, finishRace, raceResults } = useGame();
+    const { hamsters, rooms, finishRace, raceResults, mountedHamsters, userId, handleHamsterHit } = useGame();
     const trackRef = useRef<HTMLDivElement>(null);
     const finishedHamstersRef = useRef<string[]>([]);  // Use ref to maintain state between renders
+    const projectilesRef = useRef<Array<{
+        id: string;
+        x: number;
+        y: number;
+        angle: number;
+        speed: number;
+        fromHamsterId: string;
+    }>>([]);
+    const mountedHamsterId = mountedHamsters[userId];
+
+    // At the top of the component, add a constant for max projectiles
+    const MAX_PROJECTILES = 50; // Adjust this number as needed
 
     useEffect(() => {
         console.log('Race Track Component State:', {
@@ -79,6 +92,165 @@ const RaceTrack = ({ roomId, lobbyId }: RaceTrackProps) => {
         };
     }, [roomId, lobbyId, hamsters, rooms, finishRace]); // Added finishRace to dependencies
 
+    useEffect(() => {
+        // Initialize hamster health when race starts
+        if (rooms[roomId]?.lobbies[lobbyId]?.status === 'racing') {
+            const lobbyHamsterIds = rooms[roomId].lobbies[lobbyId].hamsters;
+            lobbyHamsterIds.forEach((hamsterId: string) => {
+                if (!hamsters[hamsterId]?.health) {
+                    handleHamsterHit(hamsterId); // This will set initial health to 5
+                }
+            });
+        }
+    }, [rooms, lobbyId, hamsters, handleHamsterHit]);
+
+    const handleShootLaser = useCallback((event: CustomEvent) => {
+        const { mountedHamsterId, velocityX, velocityY } = event.detail;
+        console.log('Shoot laser event received:', { mountedHamsterId, velocityX, velocityY });
+        
+        // Get the shooter's position
+        const hamsterElement = document.getElementById(`hamster-${mountedHamsterId}`);
+        if (!hamsterElement || !trackRef.current) {
+            console.log('Missing elements:', { hamsterElement, trackRef: trackRef.current });
+            return;
+        }
+
+        const hamsterRect = hamsterElement.getBoundingClientRect();
+        const trackRect = trackRef.current.getBoundingClientRect();
+
+        // Calculate starting position relative to the track
+        const startX = hamsterRect.left - trackRect.left + hamsterRect.width / 2;
+        const startY = hamsterRect.top - trackRect.top + hamsterRect.height / 2;
+
+        // Calculate angle from velocity components
+        const angle = Math.atan2(velocityY, velocityX);
+        
+        const newProjectile = {
+            id: Math.random().toString(),
+            x: startX,
+            y: startY,
+            angle,
+            speed: 15, // Constant speed for more predictable movement
+            fromHamsterId: mountedHamsterId,
+        };
+
+        projectilesRef.current = [...projectilesRef.current, newProjectile];
+    }, []);
+
+    useEffect(() => {
+        window.addEventListener('shoot-laser', handleShootLaser as EventListener);
+        return () => window.removeEventListener('shoot-laser', handleShootLaser as EventListener);
+    }, [handleShootLaser]);
+
+    useEffect(() => {
+        let animationId: number;
+
+        const updateLoop = () => {
+            updateProjectiles();
+            animationId = requestAnimationFrame(updateLoop);
+        };
+
+        animationId = requestAnimationFrame(updateLoop);
+
+        return () => cancelAnimationFrame(animationId);
+    }, []);
+
+    const updateProjectiles = () => {
+        if (!trackRef.current) return;
+        
+        console.log('Current projectiles:', projectilesRef.current.length);
+        
+        const trackWidth = trackRef.current.offsetWidth;
+        const trackHeight = trackRef.current.offsetHeight;
+        
+        const updatedProjectiles = projectilesRef.current.filter(projectile => {
+            // Update position using angle and speed
+            projectile.x += Math.cos(projectile.angle) * projectile.speed;
+            projectile.y += Math.sin(projectile.angle) * projectile.speed;
+
+            // Log projectile position
+            console.log('Projectile position:', { x: projectile.x, y: projectile.y });
+
+            // Check if out of bounds with smaller margin
+            if (projectile.x < -50 || 
+                projectile.x > trackWidth + 50 || 
+                projectile.y < -50 || 
+                projectile.y > trackHeight + 50) {
+                return false;
+            }
+
+            // Check collisions with hamsters
+            const lobby = rooms[roomId]?.lobbies[lobbyId];
+            if (!lobby) return true;
+            
+            let hasHit = false;
+            
+            lobby.hamsters.forEach((hamsterId: string) => {
+                if (hasHit || hamsterId === projectile.fromHamsterId) return;
+                
+                const hamsterElement = document.getElementById(`hamster-${hamsterId}`);
+                if (!hamsterElement) return;
+
+                const hamsterRect = hamsterElement.getBoundingClientRect();
+                const trackRect = trackRef.current!.getBoundingClientRect();
+                
+                // Simplified collision check using center points and radius
+                const hamsterCenterX = hamsterRect.left - trackRect.left + hamsterRect.width / 2;
+                const hamsterCenterY = hamsterRect.top - trackRect.top + hamsterRect.height / 2;
+                
+                const dx = projectile.x - hamsterCenterX;
+                const dy = projectile.y - hamsterCenterY;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+                
+                if (distance < 20) { // Collision radius
+                    console.log('Hit detected:', hamsterId);
+                    handleHamsterHit(hamsterId);
+                    hasHit = true;
+                    
+                    // Add hit effect
+                    createHitEffect(projectile.x, projectile.y);
+                }
+            });
+
+            return !hasHit;
+        });
+
+        projectilesRef.current = updatedProjectiles;
+    };
+
+    const createHitEffect = (x: number, y: number) => {
+        const trackElement = trackRef.current;
+        if (!trackElement) return;
+
+        // Create explosion particles
+        for (let i = 0; i < 8; i++) {
+            const particle = document.createElement('div');
+            particle.className = 'explosion-particle';
+            
+            // Random angle for each particle
+            const angle = (Math.PI * 2 * i) / 8;
+            const distance = 20;
+            
+            // Calculate transform values
+            const tx = Math.cos(angle) * distance;
+            const ty = Math.sin(angle) * distance;
+            
+            particle.style.cssText = `
+                left: ${x}px;
+                top: ${y}px;
+                background: white;
+                --tx: ${tx}px;
+                --ty: ${ty}px;
+                animation: explode 0.3s ease-out forwards;
+            `;
+            
+            trackElement.appendChild(particle);
+            
+            // Remove particle after animation
+            setTimeout(() => particle.remove(), 300);
+        }
+    };
+
     // Show loading state if no room/lobby data
     if (!rooms[roomId]?.lobbies[lobbyId]) {
         return <div>Loading...</div>;
@@ -86,6 +258,8 @@ const RaceTrack = ({ roomId, lobbyId }: RaceTrackProps) => {
 
     const lobby = rooms[roomId].lobbies[lobbyId];
     const lobbyHamsterIds = lobby.hamsters;
+
+    console.log('Race status:', lobby?.status);
 
     // Show race results if race is finished
     if (lobby.status === 'finished' && raceResults) {
@@ -134,18 +308,43 @@ const RaceTrack = ({ roomId, lobbyId }: RaceTrackProps) => {
 
     // Show race track if race is in progress
     if (lobby.status === 'racing') {
+        console.log('Mounted hamster:', { mountedHamsterId, userId, mountedHamsters });
         return (
             <div className="race-track-container h-96 relative mb-8">
+                <div className="bg-red-500 p-2">Debug: Race is in progress</div>
                 <h3 className="text-xl font-semibold mb-4">Race Track</h3>
                 <div 
-                    className="race-track relative h-80 bg-gray-800 rounded-lg overflow-hidden"
                     ref={trackRef}
+                    className="race-track relative h-80 bg-gray-800 rounded-lg overflow-hidden"
                 >
+                    {/* Debug info */}
+                    <div className="absolute top-2 left-2 text-xs text-white z-50 space-y-1">
+                        <div>Projectiles: {projectilesRef.current.length}</div>
+                        <div>Track size: {trackRef.current?.offsetWidth}x{trackRef.current?.offsetHeight}</div>
+                    </div>
+
+                    {/* Render projectiles */}
+                    {projectilesRef.current.map(projectile => (
+                        <div
+                            key={`projectile-${projectile.id}`}
+                            className="absolute w-3 h-3 bg-white rounded-full z-40"
+                            style={{
+                                left: `${projectile.x}px`,
+                                top: `${projectile.y}px`,
+                                transform: 'translate(-50%, -50%)',
+                                boxShadow: '0 0 8px 2px rgba(255, 255, 255, 0.8)',
+                            }}
+                        />
+                    ))}
+
+                    {/* Rest of your existing racing view */}
                     {lobbyHamsterIds.map((hamsterId: string, index: number) => (
                         <div
                             key={hamsterId}
                             id={`hamster-${hamsterId}`}
-                            className="hamster-racer absolute transform -translate-y-1/2"
+                            className={`hamster-racer absolute transform -translate-y-1/2 ${
+                                mountedHamsterId === hamsterId ? 'mounted-hamster' : ''
+                            }`}
                             style={{ 
                                 position: 'absolute', 
                                 left: 0,
@@ -153,17 +352,29 @@ const RaceTrack = ({ roomId, lobbyId }: RaceTrackProps) => {
                                 transform: 'translateY(-50%)'
                             }}
                         >
+                            <div className="health-bar w-12 h-1 bg-gray-700 rounded absolute -top-2 left-1/2 -translate-x-1/2">
+                                <div 
+                                    className="h-full bg-green-500 rounded transition-all duration-200"
+                                    style={{ width: `${(hamsters[hamsterId].health / 5) * 100}%` }}
+                                />
+                            </div>
                             <img 
                                 src={hamsters[hamsterId].image} 
                                 alt={hamsters[hamsterId].description} 
                                 width={30} 
                                 height={30}
-                                className="object-contain"
+                                className={`object-contain ${hamsters[hamsterId].health <= 0 ? 'hamster-defeated' : ''}`}
                             />
                         </div>
                     ))}
                     <div className="finish-line absolute right-0 top-0 h-full w-1 bg-yellow-400"></div>
                 </div>
+                {mountedHamsterId && (
+                    <GameControls 
+                        mountedHamsterId={mountedHamsterId}
+                        disabled={hamsters[mountedHamsterId]?.health <= 0}
+                    />
+                )}
             </div>
         );
     }

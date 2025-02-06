@@ -3,9 +3,20 @@
 import React, { createContext, useContext, ReactNode, useState } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 
+interface HamsterState {
+    id: string;
+    description: string;
+    image: string;
+    userId: string;
+    position: number;
+    speed: number;
+    health: number;
+    lasersRemaining: number;
+}
+
 interface GameContextType {
     rooms: Record<string, any>;
-    hamsters: Record<string, any>;
+    hamsters: Record<string, HamsterState>;
     createRoom: (name: string) => string;
     createLobby: (roomId: string) => string;
     joinLobby: (roomId: string, lobbyId: string) => void;
@@ -16,6 +27,9 @@ interface GameContextType {
     finishRace: (roomId: string, lobbyId: string, results: string[]) => void;
     mountedHamsters: Record<string, string>;
     mountHamster: (userId: string, hamsterId: string) => void;
+    shootLaser: (fromHamsterId: string, velocityX: number, velocityY: number) => void;
+    handleHamsterHit: (hamsterId: string) => void;
+    userId: string;
 }
 
 const GameContext = createContext<GameContextType | undefined>(undefined);
@@ -28,10 +42,11 @@ export function useGame() {
 
 export function GameProvider({ children }: { children: ReactNode }) {
     const [rooms, setRooms] = useState<Record<string, any>>({});
-    const [hamsters, setHamsters] = useState<Record<string, any>>({});
+    const [hamsters, setHamsters] = useState<Record<string, HamsterState>>({});
     const [currentLobby, setCurrentLobby] = useState<{ roomId: string; lobbyId: string } | null>(null);
     const [raceResults, setRaceResults] = useState<string[] | null>(null);
     const [mountedHamsters, setMountedHamsters] = useState<Record<string, string>>({});
+    const [userId] = useState<string>(() => uuidv4());
 
     const createRoom = (name: string) => {
         const roomId = uuidv4();
@@ -80,7 +95,9 @@ export function GameProvider({ children }: { children: ReactNode }) {
                 image: mockImage,
                 userId,
                 position: 0,
-                speed: Math.random() * 20 + 8
+                speed: Math.random() * 20 + 8,
+                health: 5, // Initial health
+                lasersRemaining: 3 // Initial laser count for non-mounted hamsters
             }
         }));
 
@@ -173,6 +190,56 @@ export function GameProvider({ children }: { children: ReactNode }) {
         }));
     };
 
+    const shootLaser = (fromHamsterId: string, velocityX: number, velocityY: number) => {
+        console.log('GameContext shootLaser called:', { fromHamsterId, velocityX, velocityY });
+        
+        const shooter = hamsters[fromHamsterId];
+        if (!shooter || shooter.health <= 0) {
+            console.log('Shooter not found or defeated:', { shooter });
+            return;
+        }
+
+        // Create projectile in RaceTrack component
+        const event = new CustomEvent('shoot-laser', {
+            detail: {
+                fromHamsterId,
+                velocityX,
+                velocityY
+            }
+        });
+        console.log('Dispatching shoot-laser event:', event);
+        window.dispatchEvent(event);
+    };
+
+    const handleHamsterHit = (hamsterId: string) => {
+        setHamsters(prev => {
+            const updatedHamster = {
+                ...prev[hamsterId],
+                health: Math.max(0, (prev[hamsterId]?.health || 5) - 1)
+            };
+
+            // Add hit class to trigger animation
+            const hamsterElement = document.getElementById(`hamster-${hamsterId}`);
+            if (hamsterElement) {
+                hamsterElement.classList.add('hit');
+                setTimeout(() => hamsterElement.classList.remove('hit'), 200);
+            }
+
+            // If hamster is defeated
+            if (updatedHamster.health <= 0) {
+                const hamsterElement = document.getElementById(`hamster-${hamsterId}`);
+                if (hamsterElement) {
+                    hamsterElement.classList.add('hamster-defeated');
+                }
+            }
+
+            return {
+                ...prev,
+                [hamsterId]: updatedHamster
+            };
+        });
+    };
+
     const value = {
         rooms,
         hamsters,
@@ -186,6 +253,9 @@ export function GameProvider({ children }: { children: ReactNode }) {
         finishRace,
         mountedHamsters,
         mountHamster,
+        shootLaser,
+        handleHamsterHit,
+        userId,
     };
 
     return <GameContext.Provider value={value}>{children}</GameContext.Provider>;

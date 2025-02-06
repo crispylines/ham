@@ -17,10 +17,9 @@ interface Hamster {
 export default function RoomPage() {
     const params = useParams();
     const roomId = params.roomId as string;
-    const { rooms, joinLobby, currentLobby, createLobby, hamsters, startRace, mountHamster, mountedHamsters } = useGame();
+    const { rooms, joinLobby, currentLobby, createLobby, hamsters, startRace, mountHamster, mountedHamsters, userId } = useGame();
     const [lobbyId, setLobbyId] = useState<string | null>(null);
     const [isGameMaster, setIsGameMaster] = useState(true);
-    const [userId] = useState("user123"); // In a real app, this would come from auth
 
     useEffect(() => {
         if (!roomId) return;
