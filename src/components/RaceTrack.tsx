@@ -14,6 +14,16 @@ const RaceTrack = ({ roomId, lobbyId }: RaceTrackProps) => {
     const finishedHamstersRef = useRef<string[]>([]);  // Use ref to maintain state between renders
 
     useEffect(() => {
+        console.log('Race Track Component State:', {
+            lobbyStatus: rooms[roomId]?.lobbies[lobbyId]?.status,
+            raceResults,
+            hasHamsters: !!hamsters,
+            roomExists: !!rooms[roomId],
+            lobbyExists: !!rooms[roomId]?.lobbies[lobbyId]
+        });
+    }, [roomId, lobbyId, hamsters, rooms, raceResults]);
+
+    useEffect(() => {
         if (!rooms[roomId] || !rooms[roomId].lobbies[lobbyId] || rooms[roomId].lobbies[lobbyId].status !== 'racing') {
             return;
         }
@@ -32,7 +42,7 @@ const RaceTrack = ({ roomId, lobbyId }: RaceTrackProps) => {
                 if (!hamsterElement) return;
 
                 const currentPosition = hamsters[hamsterId].position;
-                const newPosition = currentPosition + hamsters[hamsterId].speed * 0.01;
+                const newPosition = currentPosition + hamsters[hamsterId].speed * 0.04;
                 hamsters[hamsterId].position = newPosition;
                 hamsterElement.style.left = `${Math.min(newPosition, trackWidth - 30)}px`;
 
@@ -52,7 +62,9 @@ const RaceTrack = ({ roomId, lobbyId }: RaceTrackProps) => {
                 animationFrameId = requestAnimationFrame(animationFrame);
             } else {
                 // Race is finished
+                console.log('Race finished, setting results:', finishedHamstersRef.current);
                 finishRace(roomId, lobbyId, finishedHamstersRef.current);
+                cancelAnimationFrame(animationFrameId);
             }
         };
 
@@ -63,6 +75,7 @@ const RaceTrack = ({ roomId, lobbyId }: RaceTrackProps) => {
                 cancelAnimationFrame(animationFrameId);
             }
             finishedHamstersRef.current = [];
+            console.log('RaceTrack component unmounting');
         };
     }, [roomId, lobbyId, hamsters, rooms, finishRace]); // Added finishRace to dependencies
 
@@ -76,32 +89,41 @@ const RaceTrack = ({ roomId, lobbyId }: RaceTrackProps) => {
 
     // Show race results if race is finished
     if (lobby.status === 'finished' && raceResults) {
-        console.log("Showing race results:", raceResults); // Debug log
+        console.log('Rendering race results:', { raceResults, lobbyStatus: lobby.status });
         return (
             <div className="race-track-container h-96 relative mb-8">
-                <h3 className="text-xl font-semibold mb-4">Race Results! 🏆</h3>
-                <div className="bg-gray-800 rounded-lg p-6">
+                <h3 className="text-2xl font-bold mb-6 text-center">
+                    🏆 Race Results! 🏆
+                </h3>
+                <div className="race-results rounded-lg p-6 max-w-2xl mx-auto">
                     <div className="space-y-4">
                         {raceResults.map((hamsterId, index) => (
                             <div 
                                 key={hamsterId}
-                                className={`flex items-center space-x-4 p-4 ${
+                                className={`race-result-item flex items-center space-x-4 p-4 ${
                                     index === 0 ? 'bg-yellow-500/20' : 
                                     index === 1 ? 'bg-gray-400/20' : 
                                     index === 2 ? 'bg-amber-700/20' : 'bg-gray-700/10'
                                 } rounded-lg`}
                             >
-                                <span className="text-2xl">
+                                <span className="text-3xl">
                                     {index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : `${index + 1}th`}
                                 </span>
-                                <img 
-                                    src={hamsters[hamsterId].image} 
-                                    alt={hamsters[hamsterId].description}
-                                    className="w-8 h-8 object-contain"
-                                />
-                                <span className="font-medium">
-                                    {hamsters[hamsterId].description}
-                                </span>
+                                <div className="flex items-center space-x-4 flex-1">
+                                    <img 
+                                        src={hamsters[hamsterId].image} 
+                                        alt={hamsters[hamsterId].description}
+                                        className="w-12 h-12 object-contain"
+                                    />
+                                    <div className="flex flex-col">
+                                        <span className="font-medium text-lg">
+                                            {hamsters[hamsterId].description}
+                                        </span>
+                                        <span className="text-sm text-gray-400">
+                                            {index === 0 ? 'Winner!' : `Finished ${index + 1}${index === 1 ? 'st' : index === 2 ? 'nd' : index === 3 ? 'rd' : 'th'}`}
+                                        </span>
+                                    </div>
+                                </div>
                             </div>
                         ))}
                     </div>

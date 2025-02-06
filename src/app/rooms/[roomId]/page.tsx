@@ -7,6 +7,13 @@ import HamsterForm from '@/components/HamsterForm';
 import HamsterDisplay from '@/components/HamsterDisplay';
 import RaceTrack from '@/components/RaceTrack';
 
+interface Hamster {
+    id: string;
+    image: string;
+    description: string;
+    // Add other hamster properties as needed
+}
+
 export default function RoomPage() {
     const params = useParams();
     const roomId = params.roomId as string;
@@ -41,7 +48,7 @@ export default function RoomPage() {
     }
 
     const lobbyHamsterIds = lobby.hamsters;
-    const lobbyHamstersData = lobbyHamsterIds.map(id => hamsters[id]).filter(Boolean);
+    const lobbyHamstersData = lobbyHamsterIds.map((id: string) => hamsters[id]).filter(Boolean);
 
     return (
         <div className="min-h-screen bg-gradient-to-b from-gray-900 to-gray-800 text-white p-8">
@@ -52,7 +59,7 @@ export default function RoomPage() {
                         Lobby Hamsters ({lobbyHamstersData.length}/5)
                     </h2>
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                        {lobbyHamstersData.map(hamster => (
+                        {lobbyHamstersData.map((hamster: Hamster) => (
                             <HamsterDisplay key={hamster.id} hamster={hamster} />
                         ))}
                     </div>
@@ -76,7 +83,7 @@ export default function RoomPage() {
                     </div>
                 )}
 
-                {lobby.status === 'racing' && (
+                {(lobby.status === 'racing' || lobby.status === 'finished') && (
                     <RaceTrack roomId={roomId} lobbyId={lobbyId} />
                 )}
             </div>

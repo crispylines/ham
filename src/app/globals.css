@@ -44,3 +44,37 @@ body {
 .finish-line {
     box-shadow: 0 0 10px rgba(250, 204, 21, 0.5);
 }
+
+/* Add these new styles */
+.race-results {
+    background: rgba(17, 24, 39, 0.95);
+    backdrop-filter: blur(8px);
+    border: 2px solid #374151;
+    animation: fadeIn 0.3s ease-out;
+    position: relative;
+    z-index: 10;
+}
+
+.race-result-item {
+    transition: all 0.2s ease;
+}
+
+.race-result-item:hover {
+    transform: translateX(8px);
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.race-track-container {
+    position: relative;
+    z-index: 1;
+}

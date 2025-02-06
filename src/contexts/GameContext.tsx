@@ -70,7 +70,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
                 image: mockImage,
                 userId,
                 position: 0,
-                speed: Math.random() * 5 + 2
+                speed: Math.random() * 20 + 8
             }
         }));
 
@@ -108,7 +108,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
         setHamsters(prev => {
             const updatedHamsters = { ...prev };
             const lobbyHamsterIds = rooms[roomId].lobbies[lobbyId].hamsters;
-            lobbyHamsterIds.forEach(hamsterId => {
+            lobbyHamsterIds.forEach((hamsterId: string) => {
                 updatedHamsters[hamsterId] = {
                     ...updatedHamsters[hamsterId],
                     position: 0,
@@ -120,9 +120,16 @@ export function GameProvider({ children }: { children: ReactNode }) {
     };
 
     const finishRace = (roomId: string, lobbyId: string, results: string[]) => {
-        console.log("Finishing race with results:", results); // Debug log
+        console.log("Starting finishRace with:", { roomId, lobbyId, results });
+        
+        // Update race results first
         setRaceResults(results);
+        
+        // Then update room status
         setRooms(prev => {
+            // Debug log to check previous state
+            console.log("Previous rooms state:", prev);
+            
             const updatedRooms = {
                 ...prev,
                 [roomId]: {
@@ -136,8 +143,16 @@ export function GameProvider({ children }: { children: ReactNode }) {
                     }
                 }
             };
-            console.log("Updated rooms state:", updatedRooms); // Debug log
+            
+            // Debug log to check the update
+            console.log("New rooms state:", updatedRooms);
             return updatedRooms;
+        });
+
+        // Debug log to verify both states were updated
+        console.log("Current state after updates:", {
+            raceResults: results,
+            roomStatus: 'finished'
         });
     };
 
