@@ -17,9 +17,10 @@ interface Hamster {
 export default function RoomPage() {
     const params = useParams();
     const roomId = params.roomId as string;
-    const { rooms, joinLobby, currentLobby, createLobby, hamsters, startRace } = useGame();
+    const { rooms, joinLobby, currentLobby, createLobby, hamsters, startRace, mountHamster, mountedHamsters } = useGame();
     const [lobbyId, setLobbyId] = useState<string | null>(null);
     const [isGameMaster, setIsGameMaster] = useState(true);
+    const [userId] = useState("user123"); // In a real app, this would come from auth
 
     useEffect(() => {
         if (!roomId) return;
@@ -50,29 +51,54 @@ export default function RoomPage() {
     const lobbyHamsterIds = lobby.hamsters;
     const lobbyHamstersData = lobbyHamsterIds.map((id: string) => hamsters[id]).filter(Boolean);
 
+    const handleMountHamster = (hamsterId: string) => {
+        if (isGameMaster) {
+            mountHamster(userId, hamsterId);
+        }
+    };
+
     return (
         <div className="min-h-screen bg-gradient-to-b from-gray-900 to-gray-800 text-white p-8">
             <div className="max-w-4xl mx-auto">
                 <h1 className="text-3xl font-bold mb-6">Room: {rooms[roomId]?.name}</h1>
+                
+                {isGameMaster && lobby.status === 'waiting' && lobbyHamstersData.length < 5 && (
+                    <div className="bg-gray-800 rounded-lg p-6 mb-8">
+                        <h2 className="text-xl font-semibold mb-4">Create Hamsters ({lobbyHamstersData.length}/5)</h2>
+                        <HamsterForm 
+                            roomId={roomId} 
+                            lobbyId={lobbyId} 
+                            userId={userId}
+                        />
+                    </div>
+                )}
+
+                {isGameMaster && lobby.status === 'waiting' && lobbyHamstersData.length >= 5 && (
+                    <div className="bg-gray-800 rounded-lg p-6 mb-8">
+                        <p className="text-amber-400 text-center">
+                            Maximum number of hamsters (5) reached! 🐹
+                        </p>
+                    </div>
+                )}
+
                 <div className="bg-gray-800 rounded-lg p-6 mb-8">
                     <h2 className="text-xl font-semibold mb-4">
-                        Lobby Hamsters ({lobbyHamstersData.length}/5)
+                        Available Hamsters ({lobbyHamstersData.length}/5)
                     </h2>
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                         {lobbyHamstersData.map((hamster: Hamster) => (
-                            <HamsterDisplay key={hamster.id} hamster={hamster} />
+                            <HamsterDisplay 
+                                key={hamster.id} 
+                                hamster={hamster}
+                                isGameMaster={isGameMaster}
+                                onMount={() => handleMountHamster(hamster.id)}
+                                isMounted={mountedHamsters[userId] === hamster.id}
+                            />
                         ))}
                     </div>
                 </div>
 
-                {lobby.status === 'waiting' && lobbyHamstersData.length < 5 && (
-                    <div className="bg-gray-800 rounded-lg p-6">
-                        <h2 className="text-xl font-semibold mb-4">Create Your Hamster</h2>
-                        <HamsterForm roomId={roomId} lobbyId={lobbyId} userId="user123" />
-                    </div>
-                )}
-
-                {lobby.status === 'waiting' && lobbyHamstersData.length === 5 && isGameMaster && (
+                {lobby.status === 'waiting' && isGameMaster && mountedHamsters[userId] && (
                     <div className="bg-gray-800 rounded-lg p-6">
                         <button
                             onClick={() => startRace(roomId, lobbyId)}

@@ -14,6 +14,8 @@ interface GameContextType {
     currentLobby: { roomId: string; lobbyId: string } | null;
     raceResults: string[] | null;
     finishRace: (roomId: string, lobbyId: string, results: string[]) => void;
+    mountedHamsters: Record<string, string>;
+    mountHamster: (userId: string, hamsterId: string) => void;
 }
 
 const GameContext = createContext<GameContextType | undefined>(undefined);
@@ -29,6 +31,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
     const [hamsters, setHamsters] = useState<Record<string, any>>({});
     const [currentLobby, setCurrentLobby] = useState<{ roomId: string; lobbyId: string } | null>(null);
     const [raceResults, setRaceResults] = useState<string[] | null>(null);
+    const [mountedHamsters, setMountedHamsters] = useState<Record<string, string>>({});
 
     const createRoom = (name: string) => {
         const roomId = uuidv4();
@@ -59,6 +62,13 @@ export function GameProvider({ children }: { children: ReactNode }) {
     };
 
     const addHamsterToLobby = (roomId: string, lobbyId: string, description: string, userId: string) => {
+        // Check if the hamster limit has been reached
+        const currentHamsterCount = rooms[roomId]?.lobbies[lobbyId]?.hamsters?.length || 0;
+        if (currentHamsterCount >= 5) {
+            console.warn('Maximum number of hamsters (5) reached');
+            return;
+        }
+
         const hamsterId = uuidv4();
         const mockImage = `/hamster-${Math.ceil(Math.random() * 5)}.png`;
 
@@ -156,6 +166,13 @@ export function GameProvider({ children }: { children: ReactNode }) {
         });
     };
 
+    const mountHamster = (userId: string, hamsterId: string) => {
+        setMountedHamsters(prev => ({
+            ...prev,
+            [userId]: hamsterId
+        }));
+    };
+
     const value = {
         rooms,
         hamsters,
@@ -167,6 +184,8 @@ export function GameProvider({ children }: { children: ReactNode }) {
         currentLobby,
         raceResults,
         finishRace,
+        mountedHamsters,
+        mountHamster,
     };
 
     return <GameContext.Provider value={value}>{children}</GameContext.Provider>;
